@@ -3,6 +3,7 @@ from flask import Flask, abort, jsonify, request
 
 from .auth import can_delete, current_user
 from .db import close_db, get_db, init_db
+from .importer import proc
 
 MAX_TITLE = 200
 
@@ -61,5 +62,11 @@ def create_app(database: str = "notes.db") -> Flask:
         db.execute("DELETE FROM notes WHERE id = ?", (note_id,))
         db.commit()
         return "", 204
+
+    @app.post("/notes/import")
+    def import_notes():
+        user = current_user()
+        fmt = request.args.get("format", "json")
+        return jsonify(proc(request.get_data(as_text=True), user.name, fmt))
 
     return app
