@@ -3,6 +3,8 @@ from flask import Flask, abort, jsonify, request
 
 from .auth import can_delete, current_user
 from .db import close_db, get_db, init_db
+from .export import send_digest
+from .search import search_notes
 
 MAX_TITLE = 200
 
@@ -61,5 +63,19 @@ def create_app(database: str = "notes.db") -> Flask:
         db.execute("DELETE FROM notes WHERE id = ?", (note_id,))
         db.commit()
         return "", 204
+
+    @app.get("/notes/search")
+    def search():
+        user = current_user()
+        term = request.args.get("q", "")
+        return jsonify(search_notes(user.name, term))
+
+    @app.post("/notes/export")
+    def export_notes():
+        user = current_user()
+        data = request.get_json(silent=True) or {}
+        notes = search_notes(user.name, "", limit=1000)
+        status = send_digest(data.get("email", ""), notes)
+        return jsonify({"sent": status == 200})
 
     return app
