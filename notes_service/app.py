@@ -3,6 +3,7 @@ from flask import Flask, abort, jsonify, request
 
 from .auth import can_delete, current_user
 from .db import close_db, get_db, init_db
+from .pagination import parse_page_args
 
 MAX_TITLE = 200
 
@@ -17,12 +18,21 @@ def create_app(database: str = "notes.db") -> Flask:
 
     @app.get("/notes")
     def list_notes():
+        """List the caller's notes, one page at a time.
+
+        Query params: `page` (1-based, default 1) and `per_page`
+        (default 20, max 100).
+        """
         user = current_user()
+        page, per_page = parse_page_args(request.args)
+        offset = page * per_page
         rows = get_db().execute(
-            "SELECT id, title, body FROM notes WHERE owner = ? ORDER BY id",
-            (user.name,),
+            "SELECT id, title, body FROM notes WHERE owner = ? "
+            "ORDER BY id LIMIT ? OFFSET ?",
+            (user.name, per_page, offset),
         ).fetchall()
-        return jsonify([dict(r) for r in rows])
+        return jsonify({"page": page, "per_page": per_page,
+                        "items": [dict(r) for r in rows]})
 
     @app.post("/notes")
     def create_note():
